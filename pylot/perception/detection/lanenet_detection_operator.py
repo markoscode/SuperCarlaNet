@@ -12,6 +12,7 @@ import numpy as np
 
 import pylot.utils
 from pylot.perception.detection.lane import Lane
+from pylot.utils.scn_timing import track_operator_time
 
 import tensorflow as tf
 
@@ -82,6 +83,7 @@ class LanenetDetectionOperator(erdos.Operator):
         self._logger.warn('destroying {}'.format(self.config.name))
 
     @erdos.profile_method()
+    @track_operator_time('lane_detection')
     def on_camera_frame(self, msg: erdos.Message,
                         detected_lanes_stream: erdos.WriteStream):
         """Invoked whenever a frame message is received on the stream.

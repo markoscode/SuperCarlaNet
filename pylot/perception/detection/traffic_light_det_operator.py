@@ -10,6 +10,7 @@ from pylot.perception.detection.traffic_light import TrafficLight, \
     TrafficLightColor
 from pylot.perception.detection.utils import BoundingBox2D
 from pylot.perception.messages import TrafficLightsMessage
+from pylot.utils.scn_timing import track_operator_time
 
 import tensorflow as tf
 
@@ -91,6 +92,7 @@ class TrafficLightDetOperator(erdos.Operator):
             msg.timestamp, self.config.name, msg))
 
     @erdos.profile_method()
+    @track_operator_time('traffic_light_detection')
     def on_frame(self, msg: erdos.Message,
                  traffic_lights_stream: erdos.WriteStream):
         """Invoked whenever a frame message is received on the stream.

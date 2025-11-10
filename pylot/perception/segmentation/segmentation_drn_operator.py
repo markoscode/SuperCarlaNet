@@ -8,6 +8,7 @@ import erdos
 
 from pylot.perception.messages import SegmentedFrameMessage
 from pylot.perception.segmentation.segmented_frame import SegmentedFrame
+from pylot.utils.scn_timing import track_operator_time
 
 import torch
 from torch.autograd import Variable
@@ -63,6 +64,7 @@ class SegmentationDRNOperator(erdos.Operator):
         return [segmented_stream]
 
     @erdos.profile_method()
+    @track_operator_time('segmentation')
     def on_msg_camera_stream(self, msg, segmented_stream):
         """Invoked upon the receipt of a message on the camera stream.
 

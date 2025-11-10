@@ -2,6 +2,7 @@ from collections import deque
 
 import erdos
 from erdos import Message, ReadStream, Timestamp, WriteStream
+from pylot.utils.scn_timing import track_operator_time, mark_pipeline_stage, compute_e2e_latency
 
 import pylot.control.utils
 import pylot.planning.utils
@@ -61,6 +62,7 @@ class PIDControlOperator(erdos.Operator):
         self._logger.warn('destroying {}'.format(self.config.name))
 
     @erdos.profile_method()
+    @track_operator_time('control')
     def on_watermark(self, timestamp: Timestamp, control_stream: WriteStream):
         """Computes and sends the control command on the control stream.
 
@@ -96,8 +98,10 @@ class PIDControlOperator(erdos.Operator):
             '@{}: speed {}, location {}, steer {}, throttle {}, brake {}'.
             format(timestamp, current_speed, ego_transform, steer, throttle,
                    brake))
+        mark_pipeline_stage('actuator_output', timestamp)
         control_stream.send(
             ControlMessage(steer, throttle, brake, False, False, timestamp))
+        compute_e2e_latency('sensor_input', 'actuator_output', timestamp, self._logger)
 
     def on_waypoints_update(self, msg: Message):
         self._logger.debug('@{}: waypoints update'.format(msg.timestamp))

@@ -11,6 +11,7 @@ import threading
 import erdos
 
 from pylot.perception.camera_frame import CameraFrame
+from pylot.utils.scn_timing import mark_pipeline_stage
 from pylot.perception.depth_frame import DepthFrame
 from pylot.perception.messages import DepthFrameMessage, FrameMessage, \
     SegmentedFrameMessage
@@ -167,6 +168,7 @@ class CarlaCameraDriverOperator(erdos.Operator):
                             simulator_image, self._camera_setup))
 
                 if self._release_data:
+                    mark_pipeline_stage('sensor_input', timestamp)
                     self._camera_stream.send(msg)
                     self._camera_stream.send(watermark_msg)
                 else:

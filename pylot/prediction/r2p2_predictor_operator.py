@@ -9,6 +9,7 @@ import pylot.prediction.utils
 from pylot.prediction.messages import PredictionMessage
 from pylot.prediction.obstacle_prediction import ObstaclePrediction
 from pylot.utils import Location, Transform, time_epoch_ms
+from pylot.utils.scn_timing import track_operator_time
 
 import torch
 
@@ -73,6 +74,7 @@ class R2P2PredictorOperator(erdos.Operator):
         self._logger.warn('destroying {}'.format(self.config.name))
 
     @erdos.profile_method()
+    @track_operator_time('r2p2_prediction')
     def on_watermark(self, timestamp: erdos.Timestamp,
                      prediction_stream: erdos.WriteStream):
         self._logger.debug('@{}: received watermark'.format(timestamp))

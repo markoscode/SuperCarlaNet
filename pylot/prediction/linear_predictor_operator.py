@@ -1,6 +1,7 @@
 """Implements an operator that fits a linear model to predict trajectories."""
 
 import erdos
+from pylot.utils.scn_timing import track_operator_time
 from erdos import Message, ReadStream, WriteStream
 
 import numpy as np
@@ -60,6 +61,7 @@ class LinearPredictorOperator(erdos.Operator):
             msg.timestamp, self.config.name, msg))
 
     @erdos.profile_method()
+    @track_operator_time('prediction')
     def generate_predicted_trajectories(self, msg: Message,
                                         linear_prediction_stream: WriteStream):
         self._logger.debug('@{}: received trajectories message'.format(

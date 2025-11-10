@@ -11,6 +11,7 @@ from pylot.perception.detection.obstacle import Obstacle
 from pylot.perception.detection.utils import BoundingBox2D, \
     OBSTACLE_LABELS, load_coco_bbox_colors, load_coco_labels
 from pylot.perception.messages import ObstaclesMessage
+from pylot.utils.scn_timing import track_operator_time
 
 import tensorflow as tf
 
@@ -90,6 +91,7 @@ class DetectionOperator(erdos.Operator):
             msg.timestamp, self.config.name, msg))
 
     @erdos.profile_method()
+    @track_operator_time('detection')
     def on_msg_camera_stream(self, msg: erdos.Message,
                              obstacles_stream: erdos.WriteStream):
         """Invoked whenever a frame message is received on the stream.

@@ -10,6 +10,7 @@ import numpy as np
 
 from pylot.utils import Location, Pose, Quaternion, Rotation, Transform, \
         Vector3D
+from pylot.utils.scn_timing import track_operator_time
 
 
 class LocalizationOperator(erdos.Operator):
@@ -160,6 +161,7 @@ class LocalizationOperator(erdos.Operator):
         )
 
     @erdos.profile_method()
+    @track_operator_time('localization')
     def on_watermark(self, timestamp: Timestamp):
         self._logger.debug("@{}: received watermark.".format(timestamp))
         if timestamp.is_top:

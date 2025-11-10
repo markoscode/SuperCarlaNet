@@ -8,6 +8,7 @@ from collections import deque
 import erdos
 
 from pylot.perception.messages import ObstaclesMessage
+from pylot.utils.scn_timing import track_operator_time
 from pylot.perception.tracking.obstacle_trajectory import ObstacleTrajectory
 from pylot.planning.messages import WaypointsMessage
 from pylot.planning.utils import BehaviorPlannerState
@@ -181,6 +182,7 @@ class PlanningOperator(erdos.Operator):
         self._ttd_msgs.append(msg)
 
     @erdos.profile_method()
+    @track_operator_time('planning')
     def on_watermark(self, timestamp: erdos.Timestamp,
                      waypoints_stream: erdos.WriteStream):
         self._logger.debug('@{}: received watermark'.format(timestamp))

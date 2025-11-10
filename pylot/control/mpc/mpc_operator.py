@@ -9,6 +9,7 @@ from pylot.control.messages import ControlMessage
 from pylot.control.mpc.mpc import ModelPredictiveController
 from pylot.control.mpc.utils import CubicSpline2D, global_config, zero_to_2_pi
 from pylot.control.pid import PIDLongitudinalController
+from pylot.utils.scn_timing import track_operator_time
 
 
 class MPCOperator(erdos.Operator):
@@ -57,6 +58,7 @@ class MPCOperator(erdos.Operator):
         self._pose_msgs.append(msg)
 
     @erdos.profile_method()
+    @track_operator_time('mpc_control')
     def on_watermark(self, timestamp, control_stream):
         self._logger.debug('@{}: received watermark'.format(timestamp))
         if timestamp.is_top:

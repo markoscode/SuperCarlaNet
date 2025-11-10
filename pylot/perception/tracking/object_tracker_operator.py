@@ -2,6 +2,7 @@ import time
 from collections import deque
 
 import erdos
+from pylot.utils.scn_timing import track_operator_time
 
 from pylot.perception.messages import ObstaclesMessage
 
@@ -87,6 +88,7 @@ class ObjectTrackerOperator(erdos.Operator):
         return (time.time() - start) * 1000, result
 
     @erdos.profile_method()
+    @track_operator_time('tracking')
     def on_watermark(self, timestamp, obstacle_tracking_stream):
         self._logger.debug('@{}: received watermark'.format(timestamp))
         if timestamp.is_top:

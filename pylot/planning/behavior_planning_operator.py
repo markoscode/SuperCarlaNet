@@ -9,6 +9,7 @@ import pylot.utils
 from pylot.planning.messages import WaypointsMessage
 from pylot.planning.utils import BehaviorPlannerState
 from pylot.planning.waypoints import Waypoints
+from pylot.utils.scn_timing import track_operator_time
 
 
 class BehaviorPlanningOperator(erdos.Operator):
@@ -106,6 +107,7 @@ class BehaviorPlanningOperator(erdos.Operator):
         self._pose_msgs.append(msg)
 
     @erdos.profile_method()
+    @track_operator_time('behavior_planning')
     def on_watermark(self, timestamp: erdos.Timestamp,
                      trajectory_stream: erdos.WriteStream):
         self._logger.debug('@{}: received watermark'.format(timestamp))
