@@ -11,16 +11,28 @@ SuperCarlaNet (SCN) timing instrumentation for Pylot - a two-tier system to meas
 
 **Performance:** <0.1% overhead, thread-safe, production-ready
 
-## Quick Start (3 Commands)
+## Quick Start (Docker)
 
 ```bash
-# 1. Run Pylot with timing
-python3 pylot.py --flagfile=configs/detection.conf --v=1 --log_file_name=pylot.log
+# 1. Setup container (see 1_SETUP_AND_RUN.md for full steps)
+docker run -itd --gpus all --shm-size=16g --name scn_pylot erdosproject/pylot /bin/bash
+# Copy SCN files + fix utils package structure (details in 1_SETUP_AND_RUN.md)
 
-# 2. Analyze
-./scripts/scn_quick_timing_analysis.sh pylot.log
+# 2. Start CARLA
+docker exec scn_pylot bash -c 'export CARLA_HOME=/home/erdos/workspace/pylot/dependencies/CARLA_0.9.10.1 && \
+  nohup bash /home/erdos/workspace/pylot/scripts/run_simulator.sh > /tmp/carla.log 2>&1 &'
 
-# 3. View
+# 3. Run Pylot with timing
+docker exec scn_pylot bash -c 'cd /home/erdos/workspace/pylot && \
+  source scripts/set_pythonpath.sh && \
+  python3 pylot.py --flagfile=configs/detection.conf --v=1 --log_file_name=pylot.log'
+
+# 4. Analyze (after stopping Pylot)
+docker exec scn_pylot bash -c "cd /home/erdos/workspace/pylot && \
+  bash scripts/scn_quick_timing_analysis.sh pylot.log timing_results 10"
+docker cp scn_pylot:/home/erdos/workspace/pylot/timing_results ./
+
+# 5. View
 cat timing_results/tier2_statistics.txt
 ```
 

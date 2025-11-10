@@ -97,12 +97,14 @@ def track_operator_time(stage: str):
     def decorator(func):
         def wrapper(self, msg, *args, **kwargs):
             tracker = get_tracker()
-            tracker.start_operator(stage, msg.timestamp)
+            # Handle both message callbacks (msg.timestamp) and watermark callbacks (msg IS timestamp)
+            timestamp = msg.timestamp if hasattr(msg, 'timestamp') else msg
+            tracker.start_operator(stage, timestamp)
             try:
                 result = func(self, msg, *args, **kwargs)
                 return result
             finally:
-                tracker.end_operator(stage, msg.timestamp, self._logger)
+                tracker.end_operator(stage, timestamp, self._logger)
         return wrapper
     return decorator
 

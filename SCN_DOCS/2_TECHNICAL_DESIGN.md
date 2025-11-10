@@ -44,9 +44,10 @@ class TimingTracker:
     def mark_pipeline(stage, ts)
     def compute_e2e(start, end, ts, logger) -> e2e_ms
 
-@track_operator_time(stage)  # Decorator for Tier 2
+@track_operator_time(stage)  # Decorator for Tier 2 (handles both msg & watermark callbacks)
 def on_msg_callback(self, msg, stream):
     # Entire callback is timed
+    # Decorator automatically detects: msg.timestamp (messages) or msg (watermarks)
 ```
 
 **scn_timing_config.py** (80 lines)
