@@ -127,6 +127,66 @@ def on_msg_camera_stream(self, msg, stream):
 
 ---
 
+## Codebase Navigation Shortcuts
+
+**Entry point:** `pylot.py:221` generates `pylot.dot` (pipeline visualization)
+
+**Pipeline construction pattern:**
+- High-level: `pylot/component_creator.py` (chains multi-operator components)
+- Low-level: `pylot/operator_creator.py` (instantiates single operators via `erdos.connect()`)
+- Main flow: `pylot.py:130-179` (parallel detection layers → sequential planning chain)
+
+**Key operator locations:**
+- Detection: `pylot/perception/detection/detection_operator.py:93-150` (`on_msg_camera_stream`)
+- Location finder: `pylot/perception/detection/obstacle_location_finder_operator.py:67-130` (2D→3D via LiDAR frustum)
+- Tracking: `pylot/perception/tracking/*_tracker_operator.py` (5 variants: SORT, DeepSORT, DaSiamRPN, CenterTrack, QDTrack)
+- Prediction: `pylot/prediction/linear_predictor_operator.py` (8ms, constant velocity) vs `pylot/prediction/r2p2_predictor_operator.py` (50ms, scene-aware)
+- Planning: `pylot/planning/planning_operator.py:58-61` (watermark sync on 6 inputs)
+- Control: `pylot/control/pid_control_operator.py:94` (Tier 3 exit point: `mark_pipeline_stage('actuator_output')`)
+
+**Configuration system:**
+- Master flags: `pylot/flags.py` (pipeline switches, deadlines, execution modes)
+- Module flags: `pylot/{perception,planning,control}/flags.py` (model paths, algorithm params)
+- Config files: `configs/*.conf` (23 total)
+  - **challenge.conf**: Paper §7 (50km CARLA challenge, Faster-RCNN + SORT + Linear + Waypoint + PID)
+  - **e2e.conf**: Full pipeline baseline (perfect tracking/segmentation, real detection/lanes/TL)
+  - **detection.conf**: Fig 2a experiments (EDet1-7 variants, autopilot - no Tier 3)
+  - **tracking.conf**: Fig 2b experiments (SORT/DeepSORT/DaSiamRPN comparisons)
+
+**Runtime-accuracy tradeoffs (from paper data):**
+- Detection: Faster-RCNN (50ms, mAP 40) → EDet-D2 (45ms, mAP 43) → EDet-D6 (250ms, mAP 52)
+- Tracking: SORT (12ms, Kalman+Hungarian) → QDTrack (60ms, quasi-dense matching)
+- Prediction: Linear (8ms, physics) → R2P2 (50ms, GAN-based)
+- Planning: Waypoint (5ms, follow route) → Hybrid A* (200ms, grid search)
+
+**Synchronization mechanism:**
+- `erdos.add_watermark_callback([input_streams], [output_streams], callback)` ensures all inputs at same timestamp available before execution
+- Planning waits for: pose, prediction, obstacles, lanes, time_to_decision, route (6 streams)
+- Control waits for: pose, waypoints (2 streams)
+
+**LiDAR+Camera fusion flow:**
+1. Detection: 2D bbox in image (`detection_operator.py`)
+2. Project: 2D→3D frustum using camera intrinsics (`obstacle_location_finder_operator.py:82-95`)
+3. Filter: LiDAR points inside frustum
+4. Cluster: 3D centroid from point cloud
+5. Transform: World coordinates via vehicle pose
+6. Output: `Obstacle` with 3D location for planning
+
+**Perfect bypass modes (simulator ground truth):**
+- `--perfect_obstacle_detection` (bypasses detection + location finder)
+- `--perfect_obstacle_tracking` (bypasses tracker)
+- `--perfect_segmentation` (bypasses semantic segmentation)
+- `--perfect_traffic_light_detection` (bypasses TL detector)
+- `--simulator_localization` (bypasses SLAM)
+
+**Common pitfalls:**
+- **Watermark vs message callbacks**: First arg is either `msg` (with `.timestamp`) or `timestamp` directly (decorator handles both)
+- **No Tier 3 with autopilot**: Configs using `--simulator_auto_pilot` skip control operator, can't measure E2E latency
+- **Module ordering matters**: Location finder MUST follow detection (needs 2D bboxes), tracking MUST follow location finder (needs 3D obstacles)
+- **Config file stacking**: Later flags override earlier ones (e.g., `--flagfile=base.conf --obstacle_detection_model_names=ssd` changes base model)
+
+---
+
 ## Quick Commands
 
 ```bash

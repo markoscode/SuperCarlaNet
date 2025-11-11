@@ -45,6 +45,7 @@ Read in order:
 3. **[2_TECHNICAL_DESIGN.md](2_TECHNICAL_DESIGN.md)** - Architecture and implementation details
 4. **[3_DATA_COLLECTION.md](3_DATA_COLLECTION.md)** - Collecting and analyzing timing data
 5. **[4_REFERENCE.md](4_REFERENCE.md)** - Complete API and operator coverage
+6. **[5_PIPELINE_FLOW.md](5_PIPELINE_FLOW.md)** - Complete pipeline dataflow with file references
 
 **Optional:**
 - **[PYLOT_REMOTE_ANALYSIS.md](PYLOT_REMOTE_ANALYSIS.md)** - Comparison with pylot-remote fork
