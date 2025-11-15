@@ -27,6 +27,8 @@ class TimeToDecisionOperator(erdos.Operator):
         ttd = TimeToDecisionOperator.time_to_decision(msg.data.transform,
                                                       msg.data.forward_speed,
                                                       None)
+        # Log deadline for visualization (no enforcement, just tracking)
+        self._logger.info(f'DEADLINE ts=[{msg.timestamp}] deadline_ms={ttd:.1f} speed={msg.data.forward_speed:.1f}')
         time_to_decision_stream.send(erdos.Message(msg.timestamp, ttd))
 
     def on_obstacles_update(self, msg: erdos.Message):

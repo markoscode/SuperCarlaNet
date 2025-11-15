@@ -15,6 +15,70 @@ SCN timing instrumentation for Pylot AV pipeline. Measures:
 
 ---
 
+## 🚨 CRITICAL: Zombie Process Prevention
+
+**ALWAYS use graceful shutdown for Pylot visualization, or the container WILL become unusable.**
+
+### The Zombie Process Problem
+
+**What happens if you Ctrl+C Pylot improperly:**
+1. Parent Python process exits, but ERDOS operator executors keep running
+2. Each operator executor becomes a zombie process
+3. Zombies continue processing queued messages at 100% CPU
+4. Multiple runs create 20+ zombie processes consuming 10+ GB RAM
+5. When CARLA starts, ALL zombies connect and flood logs simultaneously
+6. Terminal becomes unusable with spam from dozens of processes
+
+**Real incident (Nov 12, 2024):**
+- 20+ zombie Pylot processes found running
+- 3 processes pegged at 99.9% CPU for 4199+ hours
+- Total RAM consumption: 10+ GB
+- Terminal spam was unfixable without full container reset
+
+### Prevention: ALWAYS Exit Gracefully
+
+**Correct shutdown order:**
+
+```bash
+# ALWAYS use this procedure (ESC often doesn't work):
+
+# 1. Ctrl+C in Pylot terminal
+# 2. IMMEDIATELY run BOTH kill commands:
+pkill -9 CarlaUE4 && pkill -9 python3
+
+# 3. Verify everything is dead:
+ps aux | grep -E "(python|CarlaUE4)" | grep -v grep
+# Should return NOTHING
+
+# 4. If any processes remain:
+pkill -9 -f pylot.py
+```
+
+**Why you MUST kill python3:**
+- Killing only CARLA leaves ERDOS operator executors running
+- These Python processes become zombies at 100% CPU
+- They accumulate with each run (20+ zombies possible)
+- **Killing CARLA alone is NOT enough** - this was the root cause of the Nov 12 incident
+
+**If container becomes zombie-infested:**
+
+```bash
+# On GPU server:
+cd /home/dsanyal7/marko/SuperCarlaNet
+bash reset_container.sh  # Automated clean reset
+```
+
+The reset script:
+1. Stops/removes old container
+2. Creates fresh container with X11 support
+3. Copies SCN_DOCS
+4. Sets up SSH server
+5. Ready for new SSH connection
+
+**Never try to fix zombie processes manually** - just reset the container.
+
+---
+
 ## Critical Bug Fix Applied
 
 **File:** `pylot/utils/scn_timing.py:100-107`
@@ -209,14 +273,271 @@ docker cp scn_pylot:/home/erdos/workspace/pylot/timing_results ./
 
 ---
 
+## Real-Time Visualization (Critical Technical Notes)
+
+**For Agents:** Visualization setup is COMPLEX due to X11 forwarding over SSH. Read carefully.
+
+### Architecture Understanding
+
+**User context:** Mac/Windows → SSH → GPU server → Docker container → Pylot (pygame)
+**Display chain:** XQuartz (Mac) ← SSH X11 tunnel ← GPU server ← SSH tunnel ← Container
+
+**Key insight:** X11 must be forwarded through TWO SSH hops.
+
+### What DOES NOT WORK (and Why)
+
+#### ❌ Approach 1: `docker exec` with visualization flags
+```bash
+docker exec -it scn_pylot python3 pylot.py --visualize_rgb_camera
+```
+
+**Errors:**
+- `Fatal Python error: Segmentation fault` (pygame trying hardware acceleration)
+- `pygame.error: No available video device`
+
+**Root cause:**
+- `docker exec` launches process INSIDE container but doesn't establish X11 forwarding
+- Even with `-e DISPLAY=$DISPLAY` and volume mounts, pygame can't access the SSH X11 tunnel
+- The DISPLAY variable points to a socket that doesn't exist in container's namespace
+
+**Technical detail:** SSH X11 forwarding creates a proxy X server on `localhost:10.0` (forwarded through SSH). Docker exec doesn't inherit this SSH tunnel - it only has access to the container's network namespace.
+
+#### ❌ Approach 2: `xhost +local:docker` on remote server
+```bash
+xhost +local:docker  # On GPU server
+docker run -v /tmp/.X11-unix:/tmp/.X11-unix ...
+```
+
+**Error:** `xhost: must be on local machine to add or remove hosts`
+
+**Root cause:**
+- `xhost` modifies X server access control list
+- Only works if X server runs LOCALLY on the GPU server
+- In our case, X server is XQuartz running on user's Mac (via SSH forwarding)
+- GPU server has NO actual X server (headless)
+- `/tmp/.X11-unix/` on GPU server is EMPTY (no local X sockets)
+
+**Technical detail:** This approach works for local Docker (laptop running X11 locally), NOT for remote SSH X11 forwarding.
+
+#### ❌ Approach 3: Setting SDL environment variables
+```bash
+export SDL_VIDEODRIVER=x11
+export SDL_AUDIODRIVER=dummy
+python3 pylot.py --visualize_rgb_camera
+```
+
+**Error:** Still `No available video device`
+
+**Root cause:**
+- SDL environment variables force pygame to use X11 backend (vs Wayland)
+- Doesn't fix the fundamental issue: pygame can't ACCESS the X11 display through SSH tunnel
+- SDL correctly tries to use X11, but the DISPLAY socket is unreachable
+
+### ✅ What WORKS: Nested SSH with X11 Forwarding
+
+**Working command sequence:**
+```bash
+# 1. User's terminal (with X11 forwarding to GPU server):
+ssh -Y -C user@gpu-server  # DISPLAY=localhost:10.0
+
+# 2. From GPU server, SSH into container (extends X11 tunnel):
+ssh -Y -p 20025 erdos@localhost  # DISPLAY=<container-id>:10.0
+
+# 3. Inside container, run Pylot:
+python3 pylot.py --visualize_rgb_camera  # Works!
+```
+
+**Why this works:**
+1. First SSH hop (Mac → GPU server): SSH creates X11 proxy on GPU server listening on localhost:10.0
+2. Second SSH hop (GPU server → Container): SSH creates ANOTHER X11 proxy inside container
+3. Container's DISPLAY=`<container-id>:10.0` points to this second proxy
+4. Chain: pygame → container X11 proxy → GPU X11 proxy → SSH tunnel → XQuartz on Mac
+
+**Critical flags:**
+- `-Y` (not `-X`) on Mac: Trusted X11 forwarding (required for Mac/XQuartz)
+- `-C`: Compression (speeds up graphics over network)
+
+**Container must have SSH server:**
+```bash
+docker exec scn_pylot bash -c 'sudo service ssh start'
+docker exec scn_pylot bash -c 'echo "erdos:erdos" | sudo chpasswd'  # Set password
+```
+
+**Port must be exposed:** `-p 20025:22` in docker run
+
+### Debugging Strategy for Agents
+
+**When visualization doesn't work, check in order:**
+
+**1. Verify user has X11 forwarding to GPU server:**
+```bash
+# In user's SSH session to GPU server:
+echo $DISPLAY  # Must show "localhost:10.0" or similar (NOT empty!)
+xeyes          # Must pop up window on user's local machine
+```
+If empty/fails → User must reconnect with `ssh -Y -C` (Mac needs XQuartz installed)
+
+**2. Verify container has DISPLAY set:**
+```bash
+docker exec scn_pylot bash -c 'echo $DISPLAY'
+# Should show: localhost:10.0 (if docker run with -e DISPLAY=$DISPLAY)
+```
+If empty → Container wasn't created with `-e DISPLAY=$DISPLAY`
+
+**3. Verify SSH into container establishes X11:**
+```bash
+ssh -Y -p 20025 erdos@localhost
+echo $DISPLAY  # Must show: <container-id>:10.0 (e.g., 38dab7570269:10.0)
+```
+If empty → SSH server in container not configured for X11 forwarding
+Check: `docker exec scn_pylot grep X11Forwarding /etc/ssh/sshd_config` (should be "yes")
+
+**4. Test X11 inside container:**
+```bash
+# Inside container (after SSH):
+DISPLAY=$DISPLAY xeyes  # Should pop up (if xeyes installed)
+# Or test pygame directly:
+python3 -c "import pygame; pygame.init(); print('Pygame OK')"
+```
+
+**5. Check CARLA is running:**
+```bash
+docker exec scn_pylot ps aux | grep CarlaUE4
+```
+If not running → `nohup bash scripts/run_simulator.sh > /tmp/carla.log 2>&1 &`
+
+**6. Common pygame-specific issues:**
+- **Segfault:** Usually hardware acceleration issue. Nested SSH fixes this.
+- **No video device:** DISPLAY not set or unreachable.
+- **Window appears but freezes:** Network latency. Use `-C` compression flag.
+
+### Performance Considerations
+
+**Visualization over SSH+X11 is SLOW:**
+- Expected FPS: 10-15 (vs 30+ locally)
+- Latency: 100-500ms for GUI updates
+- Network bottleneck: Uncompressed graphics data over SSH
+
+**CRITICAL: "operator events queued" warnings:**
+- **Root cause:** Detection (100ms) + X11 overhead (50-100ms) = ~150-200ms per frame
+- Pipeline can only process 5-7 FPS, but CARLA sends 20 FPS by default
+- Queue builds up → thousands of events queued → terminal spam
+- **Fix:** ALWAYS use `--simulator_fps=10` (or lower) with visualization
+
+**Optimizations:**
+- **REQUIRED:** `--simulator_fps=10` (reduces from default 20 FPS)
+- Use `-C` flag for SSH compression
+- Lower resolution: `--camera_image_width=800 --camera_image_height=600`
+- Reduce visualization: Don't enable all `--visualize_*` flags at once
+- Further reduce FPS if still seeing warnings: `--simulator_fps=5`
+- Better network: Campus network > VPN > Home internet
+
+**Command template with optimizations:**
+```bash
+python3 pylot.py --flagfile=configs/detection.conf \
+  --visualize_rgb_camera --visualize_detected_obstacles \
+  --simulator_fps=10 \
+  --camera_image_width=800 --camera_image_height=600 \
+  --v=1
+```
+
+**When to skip visualization:**
+- For production benchmarking (adds overhead)
+- For long runs (unreliable over hours)
+- For data collection (use log analysis instead)
+- When debugging non-visual issues
+
+### Alternative Monitoring (No X11 Required)
+
+**DOT graph (pipeline structure):**
+- Auto-generated: `pylot.dot` in working directory
+- Shows operator dataflow graph
+- View: `dot -Tpng pylot.dot -o graph.png`
+
+**Chrome trace (performance timeline):**
+- Flag: `--profile_file_name=pylot_profile.json`
+- View: chrome://tracing
+- Shows operator execution timeline, watermarks, message passing
+
+**Log-based timing (SCN infrastructure):**
+- Flag: `--v=1 --log_file_name=pylot.log`
+- Parse: `scripts/scn_quick_timing_analysis.sh`
+- No GUI needed, works over SSH without X11
+
+### Container Creation for Visualization
+
+**RECOMMENDED: Use automated reset script:**
+```bash
+cd /path/to/SuperCarlaNet
+bash reset_container.sh
+```
+
+The script handles:
+- Stopping/removing old container
+- Creating container with `--network=host` (required for GPU server multi-user environments)
+- Configuring SSH on port 20025 (required with host networking)
+- Copying SCN_DOCS files
+- Setting erdos password
+
+**Manual creation (if customization needed):**
+```bash
+docker run -itd \
+  --name scn_pylot \
+  --privileged \
+  --gpus all \
+  --network=host \                       # Required for shared GPU servers
+  -e DISPLAY=$DISPLAY \                  # Forward DISPLAY var
+  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \  # X11 socket (won't work but harmless)
+  erdosproject/pylot:latest
+
+# Configure SSH on port 20025 (required with --network=host):
+docker exec scn_pylot bash -c '
+  sudo sed -i "s/#Port 22/Port 20025/" /etc/ssh/sshd_config
+  sudo sed -i "s/^Port 22/Port 20025/" /etc/ssh/sshd_config
+  echo "erdos:erdos" | sudo chpasswd
+  sudo service ssh start
+'
+
+# Copy SCN_DOCS files:
+docker cp SCN_DOCS scn_pylot:/home/erdos/workspace/pylot/
+```
+
+**Why port 20025?** With `--network=host`, container shares host's network namespace. Port 22 is already used by host SSH, so container SSH must use different port (20025).
+
+**Note:** `-p 20025:22` flag is ignored with `--network=host` (port mapping doesn't apply).
+
+---
+
 ## Known Issues
 
 1. **Detection.conf** uses autopilot - no Tier 3 data. Use frenet_optimal_trajectory.conf for full pipeline.
 2. **Utils package structure** must be fixed in Docker (see above).
 3. **Decorator** handles both callback types (fixed).
+4. **Visualization requires nested SSH** - `docker exec` approach will not work for X11 forwarding over SSH.
+5. **CARLA startup requires correct directory** - Must `cd /home/erdos/workspace/pylot` before running `scripts/run_simulator.sh` (script needs $CARLA_HOME).
+6. **Visualization MUST use --simulator_fps=10** - Default 20 FPS overwhelms pipeline (detection 100ms + X11 50-100ms = can't keep up). Without this flag, "operator events queued" warnings flood terminal.
+7. **--network=host requires SSH port 20025** - Container can't use port 22 (host SSH already using it). Must configure SSH to listen on 20025.
+8. **🔴 CRITICAL: NEVER use SIGKILL (-9) on CARLA directly** - Using `pkill -9` on CarlaUE4 while it's doing GPU operations causes unkillable D-state hang. Process gets stuck in NVIDIA driver code waiting for GPU DMA. Container becomes unusable, requires Docker daemon restart. ALWAYS use SIGTERM first (allows GPU cleanup), wait 5 seconds, then SIGKILL if necessary. Use `stop_carla.sh` or updated `stop_pylot.sh` which do this correctly. This was the root cause of Nov 15 Docker corruption incident.
 
 ---
 
-**Version:** 1.0
-**Last verified:** 2025-11-10
-**Status:** Production-ready, all systems validated
+## Documentation Structure
+
+**User-facing guides:**
+- 0_START_HERE.md - Entry point
+- 1_SETUP_AND_RUN.md - Docker setup + running
+- 2_TECHNICAL_DESIGN.md - Architecture
+- 3_DATA_COLLECTION.md - Analysis workflow
+- 4_REFERENCE.md - API reference
+- 5_PIPELINE_FLOW.md - Complete dataflow
+- 6_CONFIGURATION_GUIDE.md - All config options
+- 7_VISUALIZATION_GUIDE.md - Real-time visualization setup
+
+**Agent context (this file):**
+- Technical details, debugging, what works/doesn't work
+
+---
+
+**Version:** 1.1
+**Last verified:** 2025-11-12
+**Status:** Production-ready, visualization validated on Mac+XQuartz → sysml-01.cc.gatech.edu → Docker
