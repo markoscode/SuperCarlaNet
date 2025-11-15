@@ -66,6 +66,37 @@ def add_obstacle_detection(camera_stream,
     return obstacles_streams
 
 
+def add_wsobjdet_obstacle_detection(camera_stream,
+                                     time_to_decision_stream,
+                                     csv_file_name=None):
+    """Adds weakly-supervised object detection operator.
+
+    Args:
+        camera_stream (:py:class:`erdos.ReadStream`): Stream on which camera
+            frames are received.
+        time_to_decision_stream (:py:class:`erdos.ReadStream`): Stream on
+            which time to decision messages are received.
+        csv_file_name (str): Name of csv file to log to.
+
+    Returns:
+        list(:py:class:`erdos.ReadStream`): List of obstacle streams.
+    """
+    from pylot.perception.detection.wsobjdet_operator import WSObjDetOperator
+    if csv_file_name is None:
+        csv_file_name = FLAGS.csv_log_file_name
+    op_config = erdos.OperatorConfig(
+        name='wsobjdet_obstacle_detection',
+        flow_watermarks=False,
+        log_file_name=FLAGS.log_file_name,
+        csv_log_file_name=csv_file_name,
+        profile_file_name=FLAGS.profile_file_name)
+    obstacles_stream = erdos.connect(WSObjDetOperator, op_config,
+                                     [camera_stream, time_to_decision_stream],
+                                     FLAGS.wsobjdet_model_path,
+                                     FLAGS)
+    return [obstacles_stream]
+
+
 def add_obstacle_location_finder(obstacles_stream, depth_stream, pose_stream,
                                  camera_setup):
     """Adds an operator that finds the world locations of the obstacles.

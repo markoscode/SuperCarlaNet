@@ -22,6 +22,22 @@ flags.DEFINE_float(
     'static_obstacle_distance_threshold', 70.0,
     'Max distance to consider static obstacles (e.g., traffic lights) [m]')
 
+# WSObjDet (Weakly-Supervised Object Detection) flags.
+flags.DEFINE_string(
+    'wsobjdet_model_path',
+    '/home/dsanyal7/wsobjdet/sem_ade_output_2/model_0004999.pth',
+    'Path to the trained wsobjdet model checkpoint')
+flags.DEFINE_string(
+    'wsobjdet_path',
+    '/home/dsanyal7/wsobjdet',
+    'Path to wsobjdet repository root')
+flags.DEFINE_integer('wsobjdet_gpu_index', 0,
+                     'The index of the GPU to deploy the wsobjdet model on')
+flags.DEFINE_float('wsobjdet_min_score_threshold', 0.5,
+                   'Min confidence score threshold for wsobjdet detections')
+flags.DEFINE_integer('wsobjdet_min_area', 100,
+                     'Minimum pixel area for detected regions')
+
 # Traffic light detector flags.
 flags.DEFINE_string(
     'traffic_light_det_model_path',

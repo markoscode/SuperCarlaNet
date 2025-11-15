@@ -67,7 +67,14 @@ def add_obstacle_detection(center_camera_stream,
     perfect_obstacles_stream = None
     if FLAGS.obstacle_detection:
         obstacles_stream_wo_depth = None
-        if any('efficientdet' in model
+        if any('wsobjdet' in model
+               for model in FLAGS.obstacle_detection_model_names):
+            logger.debug('Using WSObjDet obstacle detector...')
+            obstacles_streams = pylot.operator_creator.\
+                add_wsobjdet_obstacle_detection(
+                    center_camera_stream, time_to_decision_stream)
+            obstacles_stream_wo_depth = obstacles_streams[0]
+        elif any('efficientdet' in model
                for model in FLAGS.obstacle_detection_model_names):
             logger.debug('Using EfficientDet obstacle detector...')
             obstacles_streams = pylot.operator_creator.\
