@@ -10,7 +10,7 @@ CONTAINER_NAME="pylot2scn"
 DOCKER_IMAGE="erdosproject/pylot"
 PYLOT_HOME_CONTAINER="/home/erdos/workspace/pylot"
 CARLA_HOME_CONTAINER="${PYLOT_HOME_CONTAINER}/dependencies/CARLA_0.9.10.1"
-SSH_PORT="22022"  # SSH port mapping (host:container)
+SSH_PORT="22023"  # SSH port mapping (host:container)
 
 # Colors for output
 RED='\033[0;31m'
@@ -85,68 +85,101 @@ fix_utils_package() {
 
 # 3. Copy SCN timing files
 copy_timing_files() {
-    log_info "Copying SCN timing files"
+    log_info "Copying SCN timing files (all .py files)"
 
-    docker cp pylot/utils/scn_timing.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/utils/
-    docker cp pylot/utils/scn_timing_config.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/utils/
+    # Copy all .py files from pylot/utils/
+    for file in pylot/utils/*.py; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/utils/
+    done
 
     log_info "Timing files copied"
 }
 
 # 4. Copy analysis scripts
 copy_analysis_scripts() {
-    log_info "Copying analysis scripts"
+    log_info "Copying analysis scripts (all .py files)"
 
-    docker cp scripts/scn_analyze_timing.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/scripts/
-    docker cp scripts/scn_plot_cumulative_cdf.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/scripts/
-    docker cp scripts/scn_quick_timing_analysis.sh ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/scripts/
+    # Copy all .py files from scripts/
+    for file in scripts/*.py; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/scripts/
+    done
+
+    # Also copy shell scripts
+    for file in scripts/*.sh; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/scripts/
+    done
 
     log_info "Analysis scripts copied"
 }
 
-# 5. Copy all 14 modified operators
+# 5. Copy all modified operators
 copy_operators() {
-    log_info "Copying modified operators (14 files)"
+    log_info "Copying modified operators (all .py files from each directory)"
 
-    # Detection (4)
+    # Detection
     log_info "  Copying detection operators..."
-    docker cp pylot/perception/detection/detection_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/perception/detection/
-    docker cp pylot/perception/detection/efficientdet_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/perception/detection/
-    docker cp pylot/perception/detection/lanenet_detection_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/perception/detection/
-    docker cp pylot/perception/detection/traffic_light_det_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/perception/detection/
+    for file in pylot/perception/detection/*.py; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/perception/detection/
+    done
 
-    # Segmentation (1)
+    # Segmentation
     log_info "  Copying segmentation operators..."
-    docker cp pylot/perception/segmentation/segmentation_drn_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/perception/segmentation/
+    for file in pylot/perception/segmentation/*.py; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/perception/segmentation/
+    done
 
-    # Tracking (1)
+    # Tracking
     log_info "  Copying tracking operators..."
-    docker cp pylot/perception/tracking/object_tracker_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/perception/tracking/
+    for file in pylot/perception/tracking/*.py; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/perception/tracking/
+    done
 
-    # Localization (1)
+    # Localization
     log_info "  Copying localization operators..."
-    docker cp pylot/localization/localization_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/localization/
+    for file in pylot/localization/*.py; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/localization/
+    done
 
-    # Prediction (2)
+    # Prediction
     log_info "  Copying prediction operators..."
-    docker cp pylot/prediction/linear_predictor_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/prediction/
-    docker cp pylot/prediction/r2p2_predictor_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/prediction/
+    for file in pylot/prediction/*.py; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/prediction/
+    done
 
-    # Planning (2)
+    # Planning
     log_info "  Copying planning operators..."
-    docker cp pylot/planning/planning_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/planning/
-    docker cp pylot/planning/behavior_planning_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/planning/
+    for file in pylot/planning/*.py; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/planning/
+    done
 
-    # Control (2)
+    # Control
     log_info "  Copying control operators..."
-    docker cp pylot/control/pid_control_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/control/
-    docker cp pylot/control/mpc/mpc_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/control/mpc/
+    for file in pylot/control/*.py; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/control/
+    done
+    for file in pylot/control/mpc/*.py; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/control/mpc/
+    done
 
-    # Camera driver (1)
+    # Camera driver
     log_info "  Copying camera driver..."
-    docker cp pylot/drivers/carla_camera_driver_operator.py ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/drivers/
+    for file in pylot/drivers/*.py; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/drivers/
+    done
 
-    log_info "All operators copied successfully"
+    # Copy all .py files from pylot root and other key directories
+    log_info "  Copying root level .py files..."
+    for file in pylot/*.py; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/pylot/
+    done
+
+    # Copy all .conf files from configs
+    log_info "  Copying configuration files..."
+    for file in configs/*.conf; do
+        [ -f "$file" ] && docker cp "$file" ${CONTAINER_NAME}:${PYLOT_HOME_CONTAINER}/configs/
+    done
+
+    log_info "All operators and config files copied successfully"
 }
 
 # Setup: Run all setup steps
