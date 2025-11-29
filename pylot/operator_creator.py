@@ -45,6 +45,46 @@ def add_efficientdet_obstacle_detection(camera_stream,
     return obstacles_streams
 
 
+def add_ws_maskformer_detection(camera_stream,
+                                time_to_decision_stream,
+                                csv_file_name=None):
+    """Adds an operator that runs the ws_maskformer detector."""
+    from pylot.perception.detection.ws_maskformer_operator import \
+        WSMaskFormerDetectionOperator
+    if csv_file_name is None:
+        csv_file_name = FLAGS.csv_log_file_name
+    op_config = erdos.OperatorConfig(name='ws_maskformer_operator',
+                                     flow_watermarks=False,
+                                     log_file_name=FLAGS.log_file_name,
+                                     csv_log_file_name=csv_file_name,
+                                     profile_file_name=FLAGS.profile_file_name)
+    obstacles_streams = erdos.connect(WSMaskFormerDetectionOperator,
+                                      op_config,
+                                      [camera_stream, time_to_decision_stream],
+                                      FLAGS)
+    return obstacles_streams
+
+
+def add_ws_maskformer_grpc_detection(camera_stream,
+                                     time_to_decision_stream,
+                                     csv_file_name=None):
+    """Adds an operator that runs ws_maskformer via gRPC (separate container)."""
+    from pylot.perception.detection.ws_maskformer_grpc_operator import \
+        WSMaskFormerGRPCOperator
+    if csv_file_name is None:
+        csv_file_name = FLAGS.csv_log_file_name
+    op_config = erdos.OperatorConfig(name='ws_maskformer_grpc_operator',
+                                     flow_watermarks=False,
+                                     log_file_name=FLAGS.log_file_name,
+                                     csv_log_file_name=csv_file_name,
+                                     profile_file_name=FLAGS.profile_file_name)
+    obstacles_streams = erdos.connect(WSMaskFormerGRPCOperator,
+                                      op_config,
+                                      [camera_stream, time_to_decision_stream],
+                                      FLAGS)
+    return obstacles_streams
+
+
 def add_obstacle_detection(camera_stream,
                            time_to_decision_stream,
                            csv_file_name=None):

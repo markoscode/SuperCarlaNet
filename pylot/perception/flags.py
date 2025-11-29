@@ -21,6 +21,30 @@ flags.DEFINE_float('dynamic_obstacle_distance_threshold', 50.0,
 flags.DEFINE_float(
     'static_obstacle_distance_threshold', 70.0,
     'Max distance to consider static obstacles (e.g., traffic lights) [m]')
+flags.DEFINE_string(
+    'ws_maskformer_config_path', '',
+    'Path to the Mask2Former YAML config to use for the weight-sharing detector'
+)
+flags.DEFINE_string(
+    'ws_maskformer_weights_path', '',
+    'Path to the trained Mask2Former checkpoint (model_final.pth)'
+)
+flags.DEFINE_string(
+    'ws_maskformer_repo_root', '../wsobjdet',
+    'Root directory containing the wsobjdet repository (used to locate mask2former)'
+)
+flags.DEFINE_enum(
+    'ws_maskformer_subnet', 'max',
+    ['max', 'min', 'min_backbone', 'middle', 'middle_backbone_min_transformer_decoder',
+     'middle_backbone', 'min_pixel_decoder', 'min_transformer_decoder'],
+    'Selects which weight-sharing subnet to activate inside Mask2Former'
+)
+flags.DEFINE_float('ws_maskformer_min_mask_area', 200.0,
+                   'Minimum pixel area for a segmented component to become a detection')
+flags.DEFINE_string(
+    'ws_maskformer_grpc_address', 'localhost:50051',
+    'Address of the gRPC detection server (host:port) for ws_maskformer_grpc model'
+)
 
 # Traffic light detector flags.
 flags.DEFINE_string(

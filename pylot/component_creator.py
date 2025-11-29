@@ -67,8 +67,22 @@ def add_obstacle_detection(center_camera_stream,
     perfect_obstacles_stream = None
     if FLAGS.obstacle_detection:
         obstacles_stream_wo_depth = None
-        if any('efficientdet' in model
+        if any(model == 'ws_maskformer_grpc'
                for model in FLAGS.obstacle_detection_model_names):
+            logger.debug('Using weight-sharing Mask2Former detector via gRPC...')
+            obstacles_streams = pylot.operator_creator.\
+                add_ws_maskformer_grpc_detection(
+                    center_camera_stream, time_to_decision_stream)
+            obstacles_stream_wo_depth = obstacles_streams[0]
+        elif any(model == 'ws_maskformer'
+               for model in FLAGS.obstacle_detection_model_names):
+            logger.debug('Using weight-sharing Mask2Former detector...')
+            obstacles_streams = pylot.operator_creator.\
+                add_ws_maskformer_detection(
+                    center_camera_stream, time_to_decision_stream)
+            obstacles_stream_wo_depth = obstacles_streams[0]
+        elif any('efficientdet' in model
+                 for model in FLAGS.obstacle_detection_model_names):
             logger.debug('Using EfficientDet obstacle detector...')
             obstacles_streams = pylot.operator_creator.\
                 add_efficientdet_obstacle_detection(

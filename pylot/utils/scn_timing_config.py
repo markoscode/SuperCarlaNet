@@ -16,6 +16,8 @@ To instrument a new operator:
 OPERATOR_TIMING_CONFIG = {
     # Perception - Detection
     'pylot/perception/detection/detection_operator.py': 'detection',
+    'pylot/perception/detection/ws_maskformer_operator.py': 'detection',
+    'pylot/perception/detection/ws_maskformer_grpc_operator.py': 'detection_grpc',
     'pylot/perception/detection/lanenet_detection_operator.py': 'lane_detection',
     'pylot/perception/detection/traffic_light_det_operator.py': 'traffic_light_detection',
     'pylot/perception/detection/efficientdet_operator.py': 'efficient_detection',
